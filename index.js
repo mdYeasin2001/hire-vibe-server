@@ -49,6 +49,13 @@ const client = new MongoClient(uri, {
         res.send(result)
     })
 
+    //save a job data in db
+    app.post ('/job', async(req,res)=>{
+      const jobData = req.body
+      const result = await jobsCollection.insertOne(jobData)
+      res.send(result)
+    })
+
     //save an applied job data in db
     app.post ('/appliedJob', async(req,res)=>{
       const appliedJobData = req.body

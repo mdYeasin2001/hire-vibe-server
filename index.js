@@ -103,6 +103,15 @@ async function run() {
       res.send(result)
     })
 
+    //get all applied jobs data for user
+    app.get('/appliedJobs/:email', async (req, res) => {
+      const email = req.params.email
+      const query = { email : email }
+      const result = await appliedJobsCollection.find(query).toArray()
+      res.send(result)
+    })
+
+
 
     // Send a ping to confirm a successful connection
     //   await client.db("admin").command({ ping: 1 });

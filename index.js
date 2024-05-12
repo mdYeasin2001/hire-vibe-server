@@ -56,6 +56,14 @@ async function run() {
       res.send(result)
     })
 
+    //get jobs posted by a user
+    app.get('/jobs/:email', async (req, res) => {
+      const email = req.params.email
+      const query = { 'employer.email': email }
+      const result = await jobsCollection.find(query).toArray()
+      res.send(result)
+    })
+
     //save an applied job data in db
     app.post('/appliedJob', async (req, res) => {
       const appliedJobData = req.body

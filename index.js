@@ -1,5 +1,7 @@
 const express = require('express');
 const cors = require('cors');
+const jwt = require('jsonwebtoken')
+const cookieParser = require('cookie-parser')
 const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
 require('dotenv').config();
 const port = process.env.PORT || 9000;
@@ -9,12 +11,31 @@ const app = express()
 //middleware
 
 const corsOptions = {
-  origin: ['http://localhost:5173'],
+  origin: 'http://localhost:5173',
   credentials: true,
   optionSuccessStatus: 200,
 }
-app.use(cors({ corsOptions }))
+
+app.use(cors(corsOptions))
 app.use(express.json())
+app.use(cookieParser())
+
+//verify jwt middleware
+const verifyToken = (req, res, next) => {
+  const token = req.cookies?.token
+  if (!token) return res.status(401).send({ message: "unauthorized access" })
+  if (token) {
+    jwt.verify(token, process.env.ACCESS_TOKEN_SECRET, (err, decoded) => {
+      if (err) {
+        console.log(err);
+        return res.status(401).send({ message: "unauthorized access" })
+      }
+      console.log(decoded);
+      req.user = decoded
+      next()
+    })
+  }
+}
 
 
 
@@ -33,6 +54,28 @@ async function run() {
 
     const jobsCollection = client.db('jobHive').collection('jobs')
     const appliedJobsCollection = client.db('jobHive').collection('appliedJobs')
+
+
+    //jwt
+    app.post('/jwt', async (req, res) => {
+      const user = req.body
+      const token = jwt.sign(user, process.env.ACCESS_TOKEN_SECRET, { expiresIn: '30d' })
+      res.cookie('token', token, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'strict'
+      }).send({ success: true })
+    })
+
+    //clear token when logout
+    app.get('/logout', (req, res) => {
+      res.clearCookie('token', {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'strict',
+        maxAge: 0
+      }).send({ success: true })
+    })
 
 
     //get all jobs data from mongodb
@@ -57,8 +100,12 @@ async function run() {
     })
 
     //get jobs posted by a user
-    app.get('/jobs/:email', async (req, res) => {
+    app.get('/jobs/:email', verifyToken, async (req, res) => {
+      const tokenEmail = req.user.email
       const email = req.params.email
+      if (tokenEmail !== email) {
+        return res.status(403).send({ message: "access forbidden" })
+      }
       const query = { 'employer.email': email }
       const result = await jobsCollection.find(query).toArray()
       res.send(result)
@@ -85,7 +132,7 @@ async function run() {
           ...jobData
         }
       }
-      const result = await jobsCollection.updateOne(query,updateDoc,options)
+      const result = await jobsCollection.updateOne(query, updateDoc, options)
       res.send(result)
     })
 
@@ -104,9 +151,13 @@ async function run() {
     })
 
     //get all applied jobs data for user
-    app.get('/appliedJobs/:email', async (req, res) => {
+    app.get('/appliedJobs/:email', verifyToken, async (req, res) => {
+      const tokenEmail = req.user.email
       const email = req.params.email
-      const query = { email : email }
+      if (tokenEmail !== email) {
+        return res.status(403).send({ message: "access forbidden" })
+      }
+      const query = { email: email }
       const result = await appliedJobsCollection.find(query).toArray()
       res.send(result)
     })

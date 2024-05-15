@@ -11,7 +11,9 @@ const app = express()
 //middleware
 
 const corsOptions = {
-  origin: 'http://localhost:5173',
+  origin: ['http://localhost:5173',
+    'https://job-hive-e9291.web.app'
+  ],
   credentials: true,
   optionSuccessStatus: 200,
 }

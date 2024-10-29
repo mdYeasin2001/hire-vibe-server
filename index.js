@@ -11,9 +11,7 @@ const app = express()
 //middleware
 
 const corsOptions = {
-  origin: ['http://localhost:5173',
-    'https://job-hive-e9291.web.app'
-  ],
+  origin: ['http://localhost:5173'],
   credentials: true,
   optionSuccessStatus: 200,
 }
@@ -41,7 +39,7 @@ const verifyToken = (req, res, next) => {
 
 
 
-const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster0.4wc44xb.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0`;
+const uri = `mongodb+srv://${process.env.DB_USER_NAME}:${process.env.DB_PASSWORD}@cluster0.q62z2i6.mongodb.net/hire-vibe?retryWrites=true&w=majority&`;
 
 // Create a MongoClient with a MongoClientOptions object to set the Stable API version
 const client = new MongoClient(uri, {
@@ -54,8 +52,8 @@ const client = new MongoClient(uri, {
 async function run() {
   try {
 
-    const jobsCollection = client.db('jobHive').collection('jobs')
-    const appliedJobsCollection = client.db('jobHive').collection('appliedJobs')
+    const jobsCollection = client.db('hire-vibe').collection('jobs')
+    const appliedJobsCollection = client.db('hire-vibe').collection('appliedJobs')
 
 
     //jwt

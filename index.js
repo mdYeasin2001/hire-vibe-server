@@ -93,7 +93,7 @@ async function run() {
     })
 
     //get single job data
-    app.get('/job/:id', async (req, res) => {
+    app.get('/jobs/:id', async (req, res) => {
       const id = req.params.id;
       const query = { _id: new ObjectId(id) }
       const result = await jobsCollection.findOne(query)
@@ -108,13 +108,13 @@ async function run() {
     })
 
     //get jobs posted by a user
-    app.get('/jobs/:email', protect, async (req, res) => {
+    app.get('/jobs/get-mine/:email', protect, async (req, res) => {
       const tokenEmail = req.user.email
       const email = req.params.email
       if (tokenEmail !== email) {
         return res.status(403).send({ message: "access forbidden" })
       }
-      const query = { 'employer.email': email }
+      const query = { creator_email: email }
       const result = await jobsCollection.find(query).toArray()
       res.send(result)
     })
@@ -123,12 +123,13 @@ async function run() {
     app.delete('/jobs/:id', async (req, res) => {
       const id = req.params.id
       const query = { _id: new ObjectId(id) }
+      await appliedJobsCollection.deleteMany({ job_id: id })
       const result = await jobsCollection.deleteOne(query)
       res.send(result)
     })
 
     //update a job
-    app.put('/job/:id', async (req, res) => {
+    app.put('/jobs/:id', async (req, res) => {
       const id = req.params.id
       const jobData = req.body
       const query = { _id: new ObjectId(id) }

@@ -21,7 +21,7 @@ app.use(express.json())
 app.use(cookieParser())
 
 //verify jwt middleware
-const verifyToken = (req, res, next) => {
+const protect = (req, res, next) => {
   const token = req.cookies?.token
   if (!token) return res.status(401).send({ message: "unauthorized access" })
   if (token) {
@@ -53,7 +53,7 @@ async function run() {
   try {
 
     const jobsCollection = client.db('hire-vibe').collection('jobs')
-    const appliedJobsCollection = client.db('hire-vibe').collection('appliedJobs')
+    const appliedJobsCollection = client.db('hire-vibe').collection('applications')
 
 
     //jwt
@@ -108,7 +108,7 @@ async function run() {
     })
 
     //get jobs posted by a user
-    app.get('/jobs/:email', verifyToken, async (req, res) => {
+    app.get('/jobs/:email', protect, async (req, res) => {
       const tokenEmail = req.user.email
       const email = req.params.email
       if (tokenEmail !== email) {
@@ -145,28 +145,79 @@ async function run() {
     })
 
     //save an applied job data in db
-    app.post('/appliedJob', async (req, res) => {
+    app.post('/applications', protect, async (req, res) => {
+      const tokenEmail = req.user.email
       const appliedJobData = req.body
+      const job = await jobsCollection.findOne({ _id: new ObjectId(appliedJobData.job_id) })
+      if (!job) {
+        return res.status(404).send({ message: "Job not found" })
+      }
+
+      if (tokenEmail == job.creator_email) {
+        return res.status(400).send({ message: "You can't apply to your own created job" })
+      }
+
+      const jobDeadline = new Date(job.deadline);
+      const currentDate = new Date();
+
+      // Set specific hours and minutes for both dates
+      jobDeadline.setHours(23, 59, 59, 999); // Set to end of the day
+      currentDate.setHours(0, 0, 0, 0);
+
+      if (jobDeadline < currentDate) {
+        return res.status(400).send({ message: "Deadline has expired" })
+      }
+
+      const foundJob = await appliedJobsCollection.findOne({ job_id: appliedJobData.job_id, email: appliedJobData.email })
+
+      if (foundJob) {
+        return res.status(400).send({ message: "You have already applied to this job" })
+      }
+
       const result = await appliedJobsCollection.insertOne(appliedJobData)
       //updating applicants number
-      const jobId = appliedJobData.jobId;
+      const jobId = appliedJobData.job_id;
       const updateDoc = {
         $inc: { applicants_number: 1 },
       }
       const jobQuery = { _id: new ObjectId(jobId) }
-      const updateApplicantsNo = await jobsCollection.updateOne(jobQuery, updateDoc)
+      await jobsCollection.updateOne(jobQuery, updateDoc)
       res.send(result)
     })
 
     //get all applied jobs data for user
-    app.get('/appliedJobs/:email', verifyToken, async (req, res) => {
+    app.get('/applications/:email', protect, async (req, res) => {
       const tokenEmail = req.user.email
       const email = req.params.email
       if (tokenEmail !== email) {
         return res.status(403).send({ message: "access forbidden" })
       }
       const query = { email: email }
-      const result = await appliedJobsCollection.find(query).toArray()
+      const result = await appliedJobsCollection.aggregate([
+        {
+          $match: query
+        },
+        {
+          $addFields: {
+            job_id: { $toObjectId: "$job_id" }
+          }
+        },
+        {
+          $lookup: {
+            from: 'jobs',
+            let: { jobId: "$job_id" },
+            pipeline: [
+              { $match: { $expr: { $eq: ["$_id", "$$jobId"] } } },
+              { $limit: 1 } // Limit to only one job document
+            ],
+            as: 'job'
+          }
+        },
+        { $unwind: "$job" },
+        {
+          $match: req.query.job_type ? { 'job.job_type': req.query.job_type } : {}
+        }
+      ]).toArray()
       res.send(result)
     })
 

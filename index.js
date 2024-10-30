@@ -13,6 +13,8 @@ const corsOptions = {
   origin: ['http://localhost:5173'],
   credentials: true,
   optionSuccessStatus: 200,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
 }
 
 app.use(cors(corsOptions))
@@ -23,6 +25,7 @@ app.use(cookieParser())
 const protect = (req, res, next) => {
   try {
     const token = req.cookies?.token
+    console.log(req.cookies)
     if (!token) {
       return res.status(401).send({ message: "Please login first" })
     }
@@ -65,7 +68,9 @@ async function run() {
         res.cookie('token', token, {
           httpOnly: true,
           secure: process.env.NODE_ENV === 'production',
-          sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'strict'
+          sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
+          path: '/',
+          maxAge: 30 * 24 * 60 * 60 * 1000 // 30 days
         }).send({ success: true })
       } catch (error) {
         res.status(500).send({ message: "Error creating token" })
@@ -251,14 +256,31 @@ async function run() {
       }
     })
 
-    app.get('/appliedJob/:id', protect, async (req, res) => {
+    app.get('/applied-job/:id', async (req, res) => {
       try {
-        const result = await appliedJobsCollection.findOne({
+        const application = await appliedJobsCollection.findOne({
           _id: new ObjectId(req.params.id)
         })
-        if (!result) {
+        if (!application) {
           return res.status(404).send({ message: "Application not found" })
         }
+
+        const job = await jobsCollection.findOne({
+          _id: new ObjectId(application.job_id)
+        })
+        if (!job) {
+          return res.status(404).send({ message: "Associated job not found" })
+        }
+
+        const result = {
+          ...application,
+          job_title: job.job_title,
+          job_type: job.job_type,
+          deadline: job.deadline,
+          salary: job.salary,
+          description: job.description
+        }
+
         res.send(result)
       } catch (error) {
         res.status(500).send({ message: "Error fetching application" })

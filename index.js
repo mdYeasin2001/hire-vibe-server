@@ -80,10 +80,13 @@ async function run() {
 
     //get all jobs data from mongodb
     app.get('/jobs', async (req, res) => {
-      const { job_type } = req.query
+      const { job_type, search } = req.query
       let query = {}
       if (job_type) {
         query = { job_type }
+      }
+      if (search) {
+        query = { job_title: { $regex: search, $options: 'i' } }
       }
       const result = await jobsCollection.find(query).toArray()
       res.send(result)

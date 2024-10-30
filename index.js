@@ -80,7 +80,12 @@ async function run() {
 
     //get all jobs data from mongodb
     app.get('/jobs', async (req, res) => {
-      const result = await jobsCollection.find().toArray()
+      const { job_type } = req.query
+      let query = {}
+      if (job_type) {
+        query = { job_type }
+      }
+      const result = await jobsCollection.find(query).toArray()
       res.send(result)
     })
 
@@ -92,8 +97,8 @@ async function run() {
       res.send(result)
     })
 
-    //save a job data in db
-    app.post('/job', async (req, res) => {
+    //add a job data in db
+    app.post('/jobs', async (req, res) => {
       const jobData = req.body
       const result = await jobsCollection.insertOne(jobData)
       res.send(result)
